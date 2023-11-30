@@ -9,3 +9,4 @@ def clone_persian_poems_colab(poet: str='hafez') -> str:
     with open(colab_path, 'r', encoding='utf-8') as f:
         text = f.read()
     return text
+

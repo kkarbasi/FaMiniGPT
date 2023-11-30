@@ -71,3 +71,54 @@ class TransformerBlock(nn.Module):
     x = x + self.mlp(self.ln2(x))
     x = self.dropout(x)
     return x
+
+
+class PoetryModel(nn.Module):
+  def __init__(self, vocab_size,
+                     num_heads,
+                     head_size,
+                     embedding_size,
+                     multihead_size,
+                     block_size,
+                     num_transformers,
+                     dropout, 
+                     device):
+    super().__init__()
+    self.block_size = block_size
+    self.device = device
+    self.token_embedding  = nn.Embedding(vocab_size, embedding_size) # for each vocab we have an embedding
+    self.position_embedding = nn.Embedding(block_size, embedding_size)
+    self.head_transformer = TransformerBlock(num_heads, head_size, embedding_size,
+                                             multihead_size, block_size, dropout)
+    self.transformer_blocks = nn.ModuleList([TransformerBlock(num_heads, head_size, multihead_size, multihead_size, block_size, dropout) for _ in range(num_transformers)])
+    self.ln = nn.LayerNorm(multihead_size)
+    self.mha_proj = nn.Linear(multihead_size, vocab_size)
+
+  def forward(self, x, y=None):
+    B, T = x.shape
+    t_emb = self.token_embedding(x)
+    p_emb = self.position_embedding(torch.arange(T, device=self.device))
+    embeddings = t_emb + p_emb
+    mha_out = self.head_transformer(embeddings)
+    for t in self.transformer_blocks:
+      mha_out = t(mha_out)
+    logits = self.mha_proj(self.ln(mha_out))
+    loss = None
+    if y is not None:
+      B, T, C = logits.shape
+      logits = logits.view(B*T, C)
+      y = y.view(B*T)
+      loss = F.cross_entropy(logits, y)
+
+    return logits, loss
+
+  def generate(self, idx, max_new_tokens):
+    for _ in range(max_new_tokens):
+      idx_cropped = idx[:, -self.block_size:]
+      logits, loss = self(idx_cropped)
+      last_frame = logits[:, -1, :]
+      probs = torch.softmax(last_frame, dim=-1)
+      next_token = torch.multinomial(probs, num_samples=1)
+      idx = torch.concat((idx, next_token), dim=1)
+    return idx
+
