@@ -37,6 +37,7 @@ class MultiHeadAttention(nn.Module):
     out = torch.cat([h(x) for h in self.heads], dim=-1)
     return out # output size here would be num_heads * head_size (e.g. 4*16 = 64)
 
+
 class MLP(nn.Module):
   def __init__(self, multihead_size):
     super().__init__()
@@ -47,3 +48,26 @@ class MLP(nn.Module):
 
   def forward(self, x):
     return self.ff(x)
+
+
+class TransformerBlock(nn.Module):
+  def __init__(self, num_heads,
+                     head_size,
+                     embedding_size,
+                     multihead_size,
+                     block_size,
+                     dropout
+                     ):
+    super().__init__()
+    self.mha = MultiHeadAttention(num_heads, head_size, embedding_size, block_size, dropout) # output: B, T, multihead_size
+    self.mlp = MLP(multihead_size)
+    self.residual_proj = nn.Linear(embedding_size, multihead_size, bias=False)
+    self.dropout = nn.Dropout(dropout)
+    self.ln1 = nn.LayerNorm(embedding_size)
+    self.ln2 = nn.LayerNorm(multihead_size)
+
+  def forward(self, x):
+    x = self.residual_proj(x) + self.mha(self.ln1(x))
+    x = x + self.mlp(self.ln2(x))
+    x = self.dropout(x)
+    return x
