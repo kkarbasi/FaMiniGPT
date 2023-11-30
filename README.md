@@ -1,5 +1,4 @@
 # FaMiniGPT
-
 A Mini GPT for Persian poetry
 
 (Inspired by the one and only Andrej Karpathy)
