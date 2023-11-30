@@ -26,3 +26,24 @@ class Head(nn.Module):
     kq = self.dropout(kq)
     kqv = kq @ v # B, T, H
     return kqv
+
+  
+class MultiHeadAttention(nn.Module):
+  def __init__(self, num_heads, head_size, embedding_size, block_size, droppout): # head_size is the size of single head
+    super().__init__()
+    self.heads = nn.ModuleList([Head(head_size, embedding_size, block_size, droppout) for _ in range(num_heads)])
+
+  def forward(self, x):
+    out = torch.cat([h(x) for h in self.heads], dim=-1)
+    return out # output size here would be num_heads * head_size (e.g. 4*16 = 64)
+
+class MLP(nn.Module):
+  def __init__(self, multihead_size):
+    super().__init__()
+    self.ff = nn.Sequential(
+        nn.Linear(multihead_size, multihead_size),
+        nn.ReLU()
+        )
+
+  def forward(self, x):
+    return self.ff(x)
